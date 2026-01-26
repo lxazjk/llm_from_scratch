@@ -56,7 +56,7 @@ def run_train_bpe(
         Final_PAT = f"{special_pattern}|{PAT}"
     else:
         Final_PAT = PAT
-    print(f"input_path{input_path}, vocab_size{vocab_size}, special_token{special_tokens}")
+    # print(f"input_path{input_path}, vocab_size{vocab_size}, special_token{special_tokens}")
     num_processes = 64
     with open(input_path, "rb") as f:
         boundaries = find_chunk_boundaries(f, num_processes, b"<|endoftext|>")   

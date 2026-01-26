@@ -28,8 +28,11 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-
-    raise NotImplementedError
+    from cs336_basics.module.linear import Linear
+    linear_layer = Linear(d_in, d_out)
+    with torch.no_grad():
+        linear_layer.weight.copy_(weights)
+    return linear_layer(in_features)
 
 
 def run_embedding(
@@ -50,8 +53,14 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
-
-    raise NotImplementedError
+    from cs336_basics.module.embedding import Embedding
+    embedding_layer = Embedding(
+        num_embeddings = vocab_size, 
+        embedding_dim = d_model
+    )
+    with torch.no_grad():
+        embedding_layer.embedding.copy_(weights)
+    return embedding_layer(token_ids)
 
 
 def run_swiglu(
@@ -83,7 +92,13 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    from cs336_basics.module.SwiGLU import SwiGLU
+    SwiGLU_layer = SwiGLU(d_model, d_ff)
+    with torch.no_grad():
+        SwiGLU_layer.Linear1.weight.copy_(w1_weight)
+        SwiGLU_layer.Linear2.weight.copy_(w2_weight)
+        SwiGLU_layer.Linear3.weight.copy_(w3_weight)
+    return SwiGLU_layer(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -104,8 +119,8 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    raise NotImplementedError
-
+    from cs336_basics.module.scaled_dot_product_attention import scaled_dot_product_attention
+    return scaled_dot_product_attention(Q, K, V, mask)
 
 def run_multihead_self_attention(
     d_model: int,
@@ -378,7 +393,14 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
-    raise NotImplementedError
+    from cs336_basics.module.rmsnorm import RMSNorm
+    RMSNorm_layer = RMSNorm(
+        d_model = d_model,
+        eps = eps
+    )
+    with torch.no_grad():
+        RMSNorm_layer.weight.copy_(weights)
+    return RMSNorm_layer(in_features)
 
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
@@ -392,7 +414,8 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    raise NotImplementedError
+    from cs336_basics.module.SiLu import SiLU
+    return SiLU(in_features)
 
 
 def run_get_batch(
@@ -431,7 +454,8 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    raise NotImplementedError
+    from cs336_basics.module.softmax import softmax
+    return softmax(input = in_features, dim = dim)
 
 
 def run_cross_entropy(
