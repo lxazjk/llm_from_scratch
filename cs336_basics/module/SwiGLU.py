@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from cs336_basics.module.linear import Linear
+from cs336_basics.module.Linear import Linear
 from cs336_basics.module.SiLu import SiLU
 
 class SwiGLU(nn.Module):

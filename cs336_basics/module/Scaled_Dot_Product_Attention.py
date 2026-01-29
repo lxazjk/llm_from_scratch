@@ -1,7 +1,7 @@
 import torch
-from cs336_basics.module.softmax import softmax
+from cs336_basics.module.Softmax import softmax
 
-def scaled_dot_product_attention(
+def Scaled_Dot_Product_Attention(
     query: torch.tensor,
     key: torch.tensor,
     value: torch.tensor,
