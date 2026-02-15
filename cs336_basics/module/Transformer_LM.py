@@ -51,13 +51,13 @@ class Transformer_LM(nn.Module):
             dtype = self.dtype
         )
         self.Linear_layer = Linear(
-            in_feature = self.d_model, 
+            in_feature = self.d_model,
             out_feature = self.vocab_size,
             device = self.device,
             dtype = self.dtype
         )
         self.softmax = softmax
-    
+
     def forward(
         self,
         in_features: torch.tensor
@@ -66,4 +66,3 @@ class Transformer_LM(nn.Module):
         for transformer_layer in self.Transformer_layers:
             output = transformer_layer(output)
         return self.Linear_layer(self.RMSNorm_layer(output))
-        

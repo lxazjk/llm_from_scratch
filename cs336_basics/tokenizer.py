@@ -1,6 +1,9 @@
 # copy
 import os
 import json
+import tqdm
+import torch
+import numpy as np
 import regex as re
 from typing import BinaryIO, Iterable, Iterator, Tuple
 from multiprocessing import Pool, get_context
@@ -13,13 +16,12 @@ def run_train_bpe(
     input_path: str,
     vocab_size: int,
     special_tokens: list[str],
-    num_processes: int = 8
+    num_processes: int = 1
 ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
     # 1. Vocabulary Initialization
     vocab = {i: bytes([i]) for i in range(256)}
     for tok in special_tokens:
         vocab[len(vocab)] = tok.encode("utf-8")
-
     # 2. Pre-tokenization
     with open(input_path, "rb") as f:
         bounds = find_chunk_boundaries(f, num_processes, "<|endoftext|>".encode("utf-8"))
@@ -36,9 +38,8 @@ def run_train_bpe(
     merges: list[tuple[int, int]] = []
     # Get all pairs from the pre-tokenized bytes
     pair_to_indices, counts = _get_pair_counts(ids)
-
     num_merges = vocab_size - len(vocab)
-    for i in range(num_merges):
+    for i in tqdm.tqdm(range(num_merges)):
         if not counts:
             break
         # Find the most frequent pair
@@ -78,6 +79,8 @@ def run_train_bpe(
             ids[j] = new_token_ids
 
     merges = [(vocab[a], vocab[b]) for a, b in merges]
+    torch.save(merges, "merges.pt")
+    torch.save(vocab, "vocab.pt")
     return vocab, merges
 
 def _get_pair_counts(
@@ -263,3 +266,22 @@ class Tokenizer:
                 pairs = get_pairs(word)
 
         return word
+
+if __name__ == "__main__":
+    input_path = "data/TinyStoriesV2-GPT4-train.txt"
+    output_path = "data/TinyStoriesV2-GPT4-train.bin"
+
+    vocab, merges = run_train_bpe(
+        input_path = input_path,
+        vocab_size = 10000,
+        special_tokens = ["<|endoftext|>"],
+    )
+    tokenizer = Tokenizer(vocab, merges, special_tokens=["<|endoftext|>"])
+
+
+    with open(output_path, "wb") as f_out:
+        with open(input_path, "r", encoding="utf-8") as f_in:
+            for line in f_in:
+                tokens = tokenizer.encode(line)
+                arr = np.array(tokens, dtype=np.uint32)
+                f_out.write(arr.tobytes())
