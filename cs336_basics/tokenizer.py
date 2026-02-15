@@ -4,24 +4,25 @@ import regex as re
 from collections import Counter
 from multiprocessing import Pool
 from cs336_basics.pretokenization_example import find_chunk_boundaries
-PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
 def _read_context(
     input_path: str | os.PathLike,
-    PAT: str,
     start: int,
-    end: int
+    end: int,
+    PAT: re.Pattern,
+    special_tokens: list[str],
 ):
-    Final_PAT = re.compile(PAT)
     local_count = Counter()
     with open(input_path, "rb") as f:
         f.seek(start)
-        chunk = f.read(end - start).decode("utf-8", errors="ignore")
+        chunk = f.read(end - start).decode("utf-8")
         # print(chunk)
         iters = re.finditer(PAT, chunk)
         for iter in iters:
-            # print(list(iter.group().encode("utf-8")))
-            local_count[tuple(iter.group().encode("utf-8"))] += 1
+            word = iter.group()
+            if word in special_tokens:
+                continue
+            local_count[tuple(word.encode("utf-8"))] += 1
     return local_count
 
 def run_train_bpe(
@@ -30,18 +31,20 @@ def run_train_bpe(
     special_tokens: list[str],
     **kwargs,
 ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
+    PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
     if special_tokens:
         special_pattern = "|".join(re.escape(tok) for tok in special_tokens)
-        Final_PAT = f"{special_pattern}|{PAT}"
+        PAT = f"{special_pattern}|{PAT}"
     else:
-        Final_PAT = PAT
+        PAT = PAT
     # print(f"input_path{input_path}, vocab_size{vocab_size}, special_token{special_tokens}")
-    num_processes = 64
+    PAT = re.compile(PAT)
+    num_processes = 1
     with open(input_path, "rb") as f:
         boundaries = find_chunk_boundaries(f, num_processes, b"<|endoftext|>")
         tasks = []
         for start, end in zip(boundaries[:-1], boundaries[1:]):
-            tasks.append((input_path, Final_PAT, start, end))
+            tasks.append((input_path, start, end, PAT, special_tokens))
             # print(f"{start} -> {end}")
     word_count = Counter()
     with Pool(num_processes) as pool:
@@ -54,6 +57,7 @@ def run_train_bpe(
     merge = []
     for i in range(256):
         vocab[i] = bytes([i])
+        # print(f"vocab[{i}] = {vocab[i]}")
     for i in range(256, 256 + len(special_tokens)):
         vocab[i] = special_tokens[i - 256].encode("utf-8")
     base = 256 + len(special_tokens)
@@ -65,10 +69,17 @@ def run_train_bpe(
         if not pair_count:
             print(f"No more pairs to merge at iteration {offset}. Stopping.")
             break
-        best_pair = max(pair_count, key=lambda p: (pair_count[p], -p[0], -p[1]))
+        best_pair = max(pair_count, key=lambda p: (pair_count[p], vocab[p[0]], vocab[p[1]]))
+        if offset == 627:
+            print(f"best_pair = {best_pair}, {pair_count[best_pair]}")
+            print(f"best_pair = {vocab[best_pair[0]]}, {vocab[best_pair[1]]}, {pair_count[best_pair]}")
+            for pair in pair_count:
+                if vocab[pair[0]] == b'\n' and vocab[pair[1]] == b'\n':
+                    print(f"freq {pair, pair_count[pair]}")
         part1_bytes = vocab[best_pair[0]]
         part2_bytes = vocab[best_pair[1]]
         vocab[offset + base] = part1_bytes + part2_bytes
+        # print(f"merge[{offset}] = {part1_bytes} + {part2_bytes} = {vocab[offset + base]}")
         merge.append((part1_bytes, part2_bytes))
         new_word_count = Counter()
         for word in word_count:
@@ -78,7 +89,7 @@ def run_train_bpe(
                 if i + 1 < len(word) and (word[i], word[i + 1]) == best_pair:
                     new_word.append(offset + base)
                     i += 2
-                else :
+                else:
                     new_word.append(word[i])
                     i += 1
             new_word_count[tuple(new_word)] += word_count[word]
