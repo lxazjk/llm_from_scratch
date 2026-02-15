@@ -37,36 +37,34 @@ class MultiheadSelfAttention(nn.Module):
             )
         else:
             self.Rope = None
-        position = torch.arange(0, self.max_seq_len)
+        position = torch.arange(0, self.max_seq_len, device = self.device, dtype = self.dtype)
         self.causal_mask = position.unsqueeze(0) <= position.unsqueeze(1)
         self.q_proj = Linear(
-            self.num_heads * self.d_k, 
-            self.d_model, 
-            self.device, 
+            self.num_heads * self.d_k,
+            self.d_model,
+            self.device,
             self.dtype
         )
         self.k_proj = Linear(
-            self.num_heads * self.d_k, 
-            self.d_model, 
-            self.device, 
+            self.num_heads * self.d_k,
+            self.d_model,
+            self.device,
             self.dtype
         )
         self.v_proj = Linear(
-            self.num_heads * self.d_v, 
-            self.d_model, 
-            self.device, 
+            self.num_heads * self.d_v,
+            self.d_model,
+            self.device,
             self.dtype
         )
-        
+
         self.o_proj = Linear(
             self.d_model,
-            self.num_heads * self.d_v, 
-            self.device, 
+            self.num_heads * self.d_v,
+            self.device,
             self.dtype
         )
-    
-        
-        
+
     def forward(
         self,
         input: torch.tensor

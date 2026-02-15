@@ -5,6 +5,7 @@ import typing
 import numpy as np
 import torch.nn as nn
 import torch.optim as optim
+from cs336_basics.training.checkpoint import save_checkpoint
 def train(
     model: nn.Module,
     optim: optim.Optimizer,
@@ -21,17 +22,19 @@ def train(
     ],
 ):
     dataset = np.memmap(dataset_dir, dtype="int32", mode="r")
-    dataloader = data_loader(
-        dataset,
-        batch_size=batch_size,
-        context_length=context_length,
-        device=device,
-    )
     model.train()
-    for _ in tqdm.tqdm(num_step):
+    pbar = tqdm.tqdm(range(num_step))
+    for _ in pbar:
         optim.zero_grad()
-        inputs, target = dataloader()
+        inputs, target = data_loader(dataset, batch_size, context_length, device)
         logits = model(inputs)
-        loss = Loss(logits, target)
+        loss = Loss(logits, target).mean()
         loss.backward()
         optim.step()
+        pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+        if (_ + 1) % 1000 == 0:
+            save_checkpoint(
+                model = model,
+                optimizer = optim,
+                step = _
+            )
