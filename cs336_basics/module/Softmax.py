@@ -1,12 +1,12 @@
 import torch
 
 def softmax(
-    input: torch.tensor,
+    inputs: torch.tensor,
     dim: int
 ) -> torch.tensor:
-    in_type = input.dtype
-    input = input.to(torch.float32)
-    # print(f"max_ans {torch.max(input, dim = dim, keepdim = True)}")
-    max_input = torch.max(input, dim = dim, keepdim = True)[0]
-    exp_input = torch.exp(input - max_input)
+    in_type = inputs.dtype
+    input_ids = inputs.to(torch.float32)
+    max_input = torch.max(input_ids, dim = dim, keepdim = True)[0]
+    print(f"max_inputs {max_input}")
+    exp_input = torch.exp(input_ids - max_input)
     return (exp_input / torch.sum(exp_input, dim = dim, keepdim = True)).to(in_type)

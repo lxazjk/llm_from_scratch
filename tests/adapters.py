@@ -528,8 +528,8 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    from cs336_basics.module.Softmax import Softmax
-    return Softmax(input = in_features, dim = dim)
+    from cs336_basics.module.Softmax import softmax
+    return softmax(inputs = in_features, dim = dim)
 
 
 def run_cross_entropy(
@@ -547,7 +547,8 @@ def run_cross_entropy(
     Returns:
         Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    raise NotImplementedError
+    from cs336_basics.optimizer.Loss import Cross_Entropy
+    return Cross_Entropy(input_ids = inputs, target_ids = targets).mean()
 
 
 def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
@@ -559,14 +560,19 @@ def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm:
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
-    raise NotImplementedError
+    from cs336_basics.optimizer.Gradient_clipping import Gradient_Clipping
+    Gradient_Clipping(
+        parameters = parameters,
+        max_l2_norm = max_l2_norm
+    )
 
 
 def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
-    raise NotImplementedError
+    from cs336_basics.optimizer.SGD import AdamW
+    return AdamW
 
 
 def run_get_lr_cosine_schedule(
@@ -594,7 +600,14 @@ def run_get_lr_cosine_schedule(
     Returns:
         Learning rate at the given iteration under the specified schedule.
     """
-    raise NotImplementedError
+    from cs336_basics.optimizer.Learning_rate import LR_scheduler
+    return LR_scheduler(
+        t = it,
+        alpha_min = min_learning_rate,
+        alpha_max = max_learning_rate,
+        T_w = warmup_iters,
+        T_c = cosine_cycle_iters,
+    )
 
 
 def run_save_checkpoint(
