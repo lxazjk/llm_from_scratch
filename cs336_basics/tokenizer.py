@@ -12,7 +12,7 @@ def _read_context(
     start: int,
     end: int
 ):
-    Final_PAT = re.compile(PAT) 
+    Final_PAT = re.compile(PAT)
     local_count = Counter()
     with open(input_path, "rb") as f:
         f.seek(start)
@@ -74,8 +74,6 @@ def run_train_bpe(
     vocab = {}
     merge = []
     for i in range(256):
-        # if bytes([i]) == b'a':
-        #     print(f"step {i}")
         vocab[i] = bytes([i])
     for i in range(256, 256 + len(special_tokens)):
         vocab[i] = special_tokens[i - 256].encode("utf-8")
@@ -89,12 +87,9 @@ def run_train_bpe(
             print(f"No more pairs to merge at iteration {offset}. Stopping.")
             break
         best_pair = max(pair_count, key=lambda p: (pair_count[p], -p[0], -p[1]))
-        # print(f"i = {offset}, best_pair {best_pair}, {vocab[offset + base]}")
         part1_bytes = vocab[best_pair[0]]
         part2_bytes = vocab[best_pair[1]]
         vocab[offset + base] = part1_bytes + part2_bytes
-        # if vocab[offset + base] == b'nd':
-        #     print(f"offset {offset + base}")
         merge.append((part1_bytes, part2_bytes))
         new_word_count = Counter()
         for word in word_count:
