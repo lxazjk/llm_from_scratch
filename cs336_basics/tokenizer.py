@@ -1,7 +1,8 @@
 # copy
 import os
+import json
 import regex as re
-from typing import BinaryIO
+from typing import BinaryIO, Iterable, Iterator, Tuple
 from multiprocessing import Pool, get_context
 from collections import defaultdict
 
@@ -154,3 +155,111 @@ def process_chunk(args: tuple[str, int, int, list[str]]) -> list[list[int]]:
         chunk_ids.extend([list(token) for token in tokens]) # list(bytes) -> list[int]
     return chunk_ids
 
+class Tokenizer:
+    def __init__(
+        self,
+        vocab: dict[int, bytes],
+        merges: list[tuple[bytes, bytes]],
+        special_tokens: list[str] | None = None,
+    ):
+        self.vocab = vocab
+        self.byte_to_token_id = {v: k for k, v in vocab.items()}
+        self.merges = merges
+        self.bpe_ranks = dict(zip(merges, range(len(merges))))
+        self.special_tokens = special_tokens or []
+        self.special_token_bytes = [token.encode("utf-8") for token in self.special_tokens]
+        for token_bytes in self.special_token_bytes:
+            if token_bytes not in self.byte_to_token_id:
+                new_id = len(self.vocab)
+                self.vocab[new_id] = token_bytes
+                self.byte_to_token_id[token_bytes] = new_id
+
+    def encode(self, text: str) -> list[int]:
+        tokens = []
+        sorted_special_tokens = sorted(self.special_tokens, key=len, reverse=True)
+        pattern = "|".join(map(re.escape, sorted_special_tokens))
+        if pattern:
+            parts = re.split(f"({pattern})", text)
+        else:
+            parts = [text]
+        for part in parts:
+            if part in self.special_tokens:
+                tokens.append(self.byte_to_token_id[part.encode("utf-8")])
+            else:
+                tokens.extend(self._tokenize_normal(part))
+        return tokens
+
+    def encode_iterable(self, iterable: Iterable[str]) -> iter:
+        for chunk in iterable:
+            yield from self.encode(chunk)
+
+    def decode(self, ids: list[int]) -> str:
+        full_bytes = b"".join(self.vocab[token_id] for token_id in ids)
+        return full_bytes.decode("utf-8", errors="replace")
+
+    def _tokenize_normal(self, text: str) -> list[int]:
+        pre_tokens = []
+        PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        for m in re.finditer(PAT, text):
+            word = m.group(0)
+            pre_tokens.append(word)
+        token_ids = []
+        def to_bytes_tuple(word: str) -> Tuple[bytes]:
+            l = list(word.encode("utf-8"))
+            l = [bytes([x]) for x in l]
+            return tuple(l)
+        for token in pre_tokens:
+            byte_tuple = to_bytes_tuple(token)
+            merged = self._apply_merges(byte_tuple)
+            token_ids.extend(self.byte_to_token_id[b] for b in merged)
+        return token_ids
+
+    def _apply_merges(self, byte_tuple: tuple[bytes, ...]) -> list[bytes]:
+
+        word: list[bytes] = list(byte_tuple)
+
+        def get_pairs(word: list[bytes]):
+            pairs = set()
+            prev_char = word[0]
+            for char in word[1:]:
+                pairs.add((prev_char, char))
+                prev_char = char
+            return pairs
+
+        pairs = get_pairs(word)
+
+        if not pairs:
+            return word
+
+        while True:
+            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
+            if bigram not in self.bpe_ranks:
+                break
+
+            first, second = bigram
+            new_word = []
+            i = 0
+            while i < len(word):
+                try:
+                    j = word.index(first, i)
+                except ValueError:
+                    new_word.extend(word[i:])
+                    break
+                else:
+                    new_word.extend(word[i:j])
+                    i = j
+
+                if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
+                    new_word.append(first + second)
+                    i += 2
+                else:
+                    new_word.append(word[i])
+                    i += 1
+            new_word = tuple(new_word)
+            word = new_word
+            if len(word) == 1:
+                break
+            else:
+                pairs = get_pairs(word)
+
+        return word
