@@ -138,5 +138,5 @@ if __name__ == "__main__":
     optimizer = AdamW(model.parameters(), lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.01)
     loss_fn = cross_entropy
     warm_up(model, optimizer, loss_fn, args.warmup_steps)
-    profile_one_epoch_sync(model, optimizer, loss_fn, num_steps = 1)
+    profile_one_epoch_sync(model, optimizer, loss_fn, num_steps = 10)
     profile_one_epoch_async(model, optimizer, loss_fn, num_steps = 10)
