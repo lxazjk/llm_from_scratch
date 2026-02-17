@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 import argparse
 import timeit
+from torch.cuda import nvtx
 from cs336_basics.model import BasicsTransformerLM
 from cs336_basics.optimizer import AdamW
 from cs336_basics.nn_utils import cross_entropy
@@ -55,28 +56,32 @@ def profile_one_epoch_sync(
         labels = torch.randint(0, args.vocab_size, (args.batch_size, args.context_length), device="cuda")
         torch.cuda.memory._record_memory_history(enabled='all', stacks='all', max_entries=100000)
         forward_time = timeit.default_timer()
-        outputs = model(input_ids)
+        with nvtx.range("profile_one_epoch_sync forward"):
+            outputs = model(input_ids)
         if _ == num_steps - 1: torch.cuda.memory._dump_snapshot("forward_snapshot.json")
         torch.cuda.memory._record_memory_history(enabled=False)
         torch.cuda.synchronize()
         forward_time_total += timeit.default_timer() - forward_time
         loss_time = timeit.default_timer()
         torch.cuda.memory._record_memory_history(enabled='all', stacks='all', max_entries=100000)
-        loss = loss_fn(outputs, labels)
+        with nvtx.range("profile_one_epoch_sync loss_fn"):
+            loss = loss_fn(outputs, labels)
         if _ == num_steps - 1: torch.cuda.memory._dump_snapshot("loss_snapshot.json")
         torch.cuda.memory._record_memory_history(enabled=False)
         torch.cuda.synchronize()
         loss_time_total += timeit.default_timer() - loss_time
         backward_time = timeit.default_timer()
         torch.cuda.memory._record_memory_history(enabled='all', stacks='all', max_entries=100000)
-        loss.backward()
+        with nvtx.range("profile_one_epoch_sync backward"):
+            loss.backward()
         if _ == num_steps - 1: torch.cuda.memory._dump_snapshot("backward_snapshot.json")
         torch.cuda.memory._record_memory_history(enabled=False)
         torch.cuda.synchronize()
         backward_time_total += timeit.default_timer() - backward_time
         optimizer_time = timeit.default_timer()
         torch.cuda.memory._record_memory_history(enabled='all',stacks='all',max_entries=100000)
-        optimizer.step()
+        with nvtx.range("profile_one_epoch_sync optimizer.step"):
+            optimizer.step()
         if _ == num_steps - 1: torch.cuda.memory._dump_snapshot("optimizer_snapshot.json")
         torch.cuda.memory._record_memory_history(enabled=False)
         torch.cuda.synchronize()
@@ -135,8 +140,9 @@ if __name__ == "__main__":
         num_heads=args.num_heads,
         rope_theta=args.rope_theta,
     ).to(device="cuda")
+    model = torch.compile(model)
     optimizer = AdamW(model.parameters(), lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.01)
     loss_fn = cross_entropy
     warm_up(model, optimizer, loss_fn, args.warmup_steps)
-    profile_one_epoch_sync(model, optimizer, loss_fn, num_steps = 10)
-    profile_one_epoch_async(model, optimizer, loss_fn, num_steps = 10)
+    profile_one_epoch_sync(model, optimizer, loss_fn, num_steps = 2)
+    profile_one_epoch_async(model, optimizer, loss_fn, num_steps = 2)
