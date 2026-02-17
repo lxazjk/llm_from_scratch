@@ -11,8 +11,8 @@ import einx
 import torch
 import torch.nn as nn
 from torch import Tensor
+import torch.cuda.nvtx as nvtx
 from jaxtyping import Float, Bool, Int
-
 
 from .nn_utils import softmax
 
@@ -38,8 +38,9 @@ class Linear(nn.Module):
         )
 
     def forward(self, x: Float[Tensor, " ... d_in"]) -> Float[Tensor, " ... d_out"]:
-        return einsum(x, self.weight, "... d_in, d_out d_in -> ... d_out")
-    
+        with nvtx.range("Linear forward"):
+            return einsum(x, self.weight, "... d_in, d_out d_in -> ... d_out")
+
     def extra_repr(self):
         return f"d_out={self.weight.shape[0]}, d_in={self.weight.shape[1]}"
 
@@ -54,7 +55,8 @@ class Embedding(nn.Module):
         )
     
     def forward(self, token_ids: Int[Tensor, " ..."]) -> Float[Tensor, " ... d_model"]:
-        return self.weight[token_ids, :]
+        with nvtx.range("Embedding forward"):
+            return self.weight[token_ids, :]
     
     def extra_repr(self):
         return f"vocab_size={self.weight.shape[0]}, d={self.weight.shape[1]}"
@@ -98,13 +100,14 @@ class RMSNorm(nn.Module):
         # manually upcast the input to fp32 here to prevent overflow when you
         # square the input.
         # https://github.com/pytorch/pytorch/issues/66707
-        in_dtype = x.dtype
+        with nvtx.range("RMSNorm forward"):
+            in_dtype = x.dtype
 
-        x = x.to(torch.float32)
-        rms = torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
-        x = x * rms
+            x = x.to(torch.float32)
+            rms = torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
+            x = x * rms
 
-        return (self.weight * x).to(in_dtype)
+            return (self.weight * x).to(in_dtype)
     
     def extra_repr(self):
         return f"hidden_size={self.weight.shape[0]}, eps={self.eps}"
@@ -132,20 +135,21 @@ class RotaryEmbedding(nn.Module):
         return torch.stack((cos, sin))
 
     def forward(self, x: Float[Tensor, " ... seq d"], pos_ids: Int[Tensor, " ... seq"]) -> Float[Tensor, " ... seq d"]:
-        x1, x2 = rearrange(x, '... (half_d xy) -> xy ... half_d', xy=2)
+        with nvtx.range("RotaryEmbedding forward"):
+            x1, x2 = rearrange(x, '... (half_d xy) -> xy ... half_d', xy=2)
 
-        # Standard
-        # cos, sin = self._freq_cis_cache[:, pos_ids, :]
+            # Standard
+            # cos, sin = self._freq_cis_cache[:, pos_ids, :]
 
-        # einx
-        cos, sin = einx.get_at('cos_sin [pos] half_dim, ... -> cos_sin ... half_dim', self._freq_cis_cache, pos_ids)
+            # einx
+            cos, sin = einx.get_at('cos_sin [pos] half_dim, ... -> cos_sin ... half_dim', self._freq_cis_cache, pos_ids)
 
-        # 2D rotation matrix applied to pairs in x
-        x1_rot = cos * x1 - sin * x2
-        x2_rot = sin * x1 + cos * x2
-        result = einx.rearrange('... x_half, ... x_half -> ... (x_half (1 + 1))', x1_rot, x2_rot).contiguous()
-        return result
-    
+            # 2D rotation matrix applied to pairs in x
+            x1_rot = cos * x1 - sin * x2
+            x2_rot = sin * x1 + cos * x2
+            result = einx.rearrange('... x_half, ... x_half -> ... (x_half (1 + 1))', x1_rot, x2_rot).contiguous()
+            return result
+
     def extra_repr(self):
         return f"context_length={self._freq_cis_cache.shape[0]}, dim/2={self._freq_cis_cache.shape[1]}"
 
@@ -377,11 +381,13 @@ class TransformerBlock(nn.Module):
         # NOTE: this is a pre-norm Transformer, and differs from the original
         # description in the paper.
         # Apply the multi-head self-attention sublayer
-        x_attn = self.attn(self.ln1(x))
+        with nvtx.range("TransformerBlock forward attn"):
+            x_attn = self.attn(self.ln1(x))
         attn_sublayer_output = x + x_attn
 
         # Apply the feed-forward sublayer
-        x_ffn = self.ffn(self.ln2(attn_sublayer_output))
+        with nvtx.range("TransformerBlock forward ffn"):
+            x_ffn = self.ffn(self.ln2(attn_sublayer_output))
         ffn_sublayer_output = attn_sublayer_output + x_ffn
         return ffn_sublayer_output
 
@@ -394,7 +400,8 @@ class SwiGLU(nn.Module):
         self.w3 = Linear(d_model, d_ff)
 
     def forward(self, x):
-        return self.w2(silu(self.w1(x)) * self.w3(x))
+        with nvtx.range("SwiGLU forward"):
+            return self.w2(silu(self.w1(x)) * self.w3(x))
 
 
 def scaled_dot_product_attention(
@@ -487,9 +494,12 @@ class CausalMultiHeadSelfAttention(nn.Module):
         *b, sequence_length, d_model = x.size()
         assert d_model == self.d_model
 
-        Q = self.q_proj(x)
-        K = self.k_proj(x)
-        V = self.v_proj(x)
+        with nvtx.range("CausalMultiHeadSelfAttention forward q_proj"):
+            Q = self.q_proj(x)
+        with nvtx.range("CausalMultiHeadSelfAttention forward k_proj"):
+            K = self.k_proj(x)
+        with nvtx.range("CausalMultiHeadSelfAttention forward v_proj"):
+            V = self.v_proj(x)
 
         # Take apart each head from the embedding dimension of Q, K, V to shape (..., num_heads, seq_len, d_k).
         Q, K, V = (
@@ -503,8 +513,10 @@ class CausalMultiHeadSelfAttention(nn.Module):
         # Duplicate token positions for each head
         token_positions = rearrange(token_positions, "... seq -> ... 1 seq")
 
-        Q = self.positional_encoder(Q, token_positions)
-        K = self.positional_encoder(K, token_positions)
+        with nvtx.range("CausalMultiHeadSelfAttention forward positional_encoder Q"):
+            Q = self.positional_encoder(Q, token_positions)
+        with nvtx.range("CausalMultiHeadSelfAttention forward positional_encoder K"):
+            K = self.positional_encoder(K, token_positions)
 
         # Construct causal mask
         seq = torch.arange(sequence_length, device=x.device)
@@ -513,7 +525,8 @@ class CausalMultiHeadSelfAttention(nn.Module):
         causal_mask = qi >= kj  # (query, key)
 
         # Shape: (..., num_heads, sequence_length, d_k)
-        attn_output = scaled_dot_product_attention(K=K, Q=Q, V=V, mask=causal_mask)
+        with nvtx.range("CausalMultiHeadSelfAttention forward scaled_dot_product_attention"):
+            attn_output = scaled_dot_product_attention(K=K, Q=Q, V=V, mask=causal_mask)
 
         # Concatenate the attention output from all heads.
         # (..., sequence_length, num_heads * d_v).
