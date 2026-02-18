@@ -53,22 +53,6 @@ def flash_attn_fwd_kernel(
         block_shape = (k_tile, D_v),
         order = (1, 0)
     )
-    output_block_ptr = tl.make_block_ptr(
-        base = O_ptr + bs_id * stride_ob,
-        shape = (q_seq, D_v),
-        strides = (stride_os, stride_od),
-        offsets = (q_tile_id * q_tile, 0),
-        block_shape = (q_tile, D_v),
-        order = (1, 0)
-    )
-    l_block_ptr = tl.make_block_ptr(
-        base = L_ptr + bs_id * stride_lb,
-        shape = (q_seq,),
-        strides = (stride_ls,),
-        offsets = (q_tile_id * q_tile,),
-        block_shape = (q_tile,),
-        order = (0,)
-    )
     l = tl.zeros((q_tile,), dtype=tl.float32)
     m = tl.full((q_tile,), -float("inf"), dtype=tl.float32)
     o_block = tl.zeros((q_tile, D_v), dtype=tl.float32)
@@ -88,43 +72,38 @@ def flash_attn_fwd_kernel(
         m = new_m
         k_block_ptr = tl.advance(k_block_ptr, (k_tile, 0))
         v_block_ptr = tl.advance(v_block_ptr, (k_tile, 0))
+    output_block_ptr = tl.make_block_ptr(
+        base = O_ptr + bs_id * stride_ob,
+        shape = (q_seq, D_v),
+        strides = (stride_os, stride_od),
+        offsets = (q_tile_id * q_tile, 0),
+        block_shape = (q_tile, D_v),
+        order = (1, 0)
+    )
+    l_block_ptr = tl.make_block_ptr(
+        base = L_ptr + bs_id * stride_lb,
+        shape = (q_seq,),
+        strides = (stride_ls,),
+        offsets = (q_tile_id * q_tile,),
+        block_shape = (q_tile,),
+        order = (0,)
+    )
     tl.store(output_block_ptr, o_block / l[:, None])
     tl.store(l_block_ptr, tl.log(l) + m)
 
 def flash_attn_fwd(
     Query, Key, Value, Output, L, scale, head_tile, q_tile, k_tile
 ):
-    batch_size, num_heads, q_seq, D_k = Query.shape
-    _, _, k_seq, _ = Key.shape
-    _, _, _, D_v = Value.shape
-    Query = Query.view(-1, q_seq, D_k)
-    Key = Key.view(-1, k_seq, D_k)
-    Value = Value.view(-1, k_seq, D_v)
-    flash_attn_fwd_kernel[Ceil(batch_size * num_heads, head_tile), Ceil(q_seq, q_tile)](
-        Q_ptr = Query,
-        K_ptr = Key,
-        V_ptr = Value,
-        O_ptr = Output,
-        L_ptr = L,
-        stride_qb = Query.stride(0),
-        stride_qs = Query.stride(1),
-        stride_qd = Query.stride(2),
-        stride_kb = Key.stride(0),
-        stride_ks = Key.stride(1),
-        stride_kd = Key.stride(2),
-        stride_vb = Value.stride(0),
-        stride_vs = Value.stride(1),
-        stride_vd = Value.stride(2),
-        stride_ob = Output.stride(0),
-        stride_os = Output.stride(1),
-        stride_od = Output.stride(2),
-        stride_lb = L.stride(0),
-        stride_ls = L.stride(1),
-        q_seq = q_seq,
-        k_seq = k_seq,
-        scale = scale,
-        D_k = D_k,
-        D_v = D_v,
-        q_tile = q_tile,
-        k_tile = k_tile
+    batch_size, q_seq, D_k = Query.shape
+    _, k_seq, _ = Key.shape
+    _, _, D_v = Value.shape
+    flash_attn_fwd_kernel[Ceil(batch_size, head_tile), Ceil(q_seq, q_tile)](
+        Query, Key, Value, Output, L,
+        Query.stride(0), Query.stride(1), Query.stride(2),
+        Key.stride(0), Key.stride(1), Key.stride(2),
+        Value.stride(0), Value.stride(1), Value.stride(2),
+        Output.stride(0), Output.stride(1), Output.stride(2),
+        L.stride(0), L.stride(1),
+        q_seq, k_seq, scale,
+        D_k, D_v, q_tile, k_tile
     )
