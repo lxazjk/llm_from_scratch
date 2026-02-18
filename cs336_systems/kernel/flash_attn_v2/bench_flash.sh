@@ -1,0 +1,1 @@
+uv run benchmark.py --d_k 512 --d_v 512 --num_heads 16 --batch_size 64 --seq_len 1024
