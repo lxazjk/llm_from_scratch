@@ -82,7 +82,7 @@ class FlashAttentionFunction(torch.autograd.Function):
         ctx.save_for_backward(q, k, v)
         ctx.q_shape, ctx.k_shape, ctx.v_shape = q.shape, k.shape, v.shape
         ctx.scale = scale
-        q_flat, k_flat, v_flat = q.view(-1, q.shape[2], q.shape[3]), k.view(-1, k.shape[2], k.shape[3]), v.view(-1, v.shape[2], v.shape[3])
+        q_flat, k_flat, v_flat = q.view(-1, q.shape[1], q.shape[2]), k.view(-1, k.shape[1], k.shape[2]), v.view(-1, v.shape[1], v.shape[2])
         B_H, S, Dk = q_flat.shape
         Dv = v_flat.shape[-1]
         o = torch.empty((B_H, S, Dv), dtype=q.dtype, device=q.device)
@@ -111,10 +111,10 @@ if __name__ == "__main__":
     d_k = args.d_k
     d_v = args.d_v
     warmup_steps = args.warmup_steps
-    query = torch.randn(batch_size, num_heads, seq_len, d_k, device="cuda", requires_grad=True)
-    key = torch.randn(batch_size, num_heads, seq_len, d_k, device="cuda", requires_grad=True)
-    value = torch.randn(batch_size, num_heads, seq_len, d_v,device="cuda", requires_grad=True)
-    L = torch.zeros(batch_size, num_heads, seq_len, device="cuda", requires_grad=True)
+    query = torch.randn(batch_size, seq_len, d_k, device="cuda", requires_grad=True)
+    key = torch.randn(batch_size, seq_len, d_k, device="cuda", requires_grad=True)
+    value = torch.randn(batch_size, seq_len, d_v,device="cuda", requires_grad=True)
+    L = torch.zeros(batch_size, seq_len, device="cuda", requires_grad=True)
     forward_output, q_grad, k_grad, v_grad = warm_up(query, key, value, warmup_steps)
     baseline(query, key, value)
     q_triton = query.detach().clone().requires_grad_()

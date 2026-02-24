@@ -6,8 +6,8 @@ import torch.multiprocessing as mp
 def setup(rank, world_size):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "39500"
-    # dist.init_process_group("gloo", rank=rank, world_size=world_size)
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    # dist.init_process_group("gloo", rank=rank, world_size=world_size) # CPU
+    dist.init_process_group("nccl", rank=rank, world_size=world_size) # GPU
 
 
 def distributed_demo(rank, world_size):

@@ -1,5 +1,5 @@
 echo "Small model"
-uv run cs336_systems/distributed/ddp_baseline.py --d_model 768 --context_length 128 --d_ff 3072 --num_heads 12 --num_layers 12 # small
+uv run cs336_systems/distributed/ddp_baseline.py  --d_model 768 --context_length 128 --d_ff 3072 --num_heads 12 --num_layers 12 # small
 
 # echo "Medium model"
 # uv run cs336_systems/benchmark/e2e_benchmark.py --d_model 1024 --context_length 128 --d_ff 4096 --num_heads 16 --num_layers 24 # medium
