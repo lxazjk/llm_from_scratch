@@ -2,117 +2,106 @@
 
 All changes we make to the assignment code or PDF will be documented in this file.
 
-## [1.0.5] - 2025-07-03
-### Fixed
-- code: typos regarding FlashAttention2 in the adapters
-
-### Added
-- code: .python-version constraint for Python 3.12
-
-## [1.0.4] - 2025-04-27
-
-### Fixed
-- handout: details for leaderboard submission
-- handout: replace Pytorch profiler with Nsight for DDP
-
-### Added
-- handout: clarify which attention implementations to benchmark
-
-## [1.0.3] - 2025-04-24
-### Fixed
-- handout: `memory_profiling` (b) should sweep over context length, not model size
-- handout: keyword argument in FA2 Triton starter code from `tile_shape` -> `block_shape`
-- handout: minor typo in `flash_backward` problem statement
-- handout: launch all-gather example using `uv run`
-
-## [1.0.2] - 2025-04-22
-### Added
-- handout: clarify interface for flash autograd function
-- handout: clarify submission for attention benchmarking
-
-### Fixed
-- handout: fix small notation issues in the flash algorithm
-- handout: fix math error and explanation for flash backward savings
-- handout: change parameters used for attention benchmarking to be sensible
-
-### Removed
-- handout: some memory benchmarking that is incompatible with modern PyTorch
-
-## [1.0.1] - 2025-04-17
-### Added
-- code: Include tests for logsumexp in flash forward implementation
-- handout: Clarify interface for flash autograd function
-- code: Test causal=True for forward as well as backward
-
-## [1.0.0] - 2025-04-16
-
-### Added
-- handout/code: add FlashAttention2
-- handout: add proper profiling with Nsight Systems
-- handout: add communication accounting
-- code: tests for additional content
-
-### Changed
-- handout: greatly improve demo example for Triton
-- handout: remove busywork for communication
-
-### Fixed
-
-- handout: clarify that `ddp_bucketed_benchmarking` doesn't require the full
-  grid of runs.
-
-## [0.0.4] - 2024-04-23
+## [unreleased] - yyyy-mm-dd
 
 ### Added
 
 ### Changed
 
-- code: remove try-finally blocks in DDP tests.
-
 ### Fixed
 
-- handout: remove outdated mention of a problem that doesn't exist on the assignment
-- handout: fix Slurm environment variables in examples.
-- handout: clarify assumptions in `ddp_bucketed_benchmarking` (b).
+## [2.0.1] - 2026-06-03
 
-## [0.0.3] - 2024-04-21
+### Added
+- both: additional prompt files and writeup clarifications to clarify prompting
+- both: modal utils and shared volume with safety models and datasets
+
+### Changed
+
+### Fixed
+- both: updated alpaca eval command to work with new package versions; downloaded gpt4-turbo reference data
+
+## [2.0.0] - 2026-05-20
+
+### Added
+- both: added MaxRL, GSPO
+- both: added few-shot r1_zero prompt
+- both: 4 random seeds (up from 1 random seed)
+- handout: added math and word problems
+
+### Changed
+- handout: changed from Qwen-2.5-Math-1.5B on MATH to Olmo-2-1B on GSM8K
+
+### Fixed
+- code: Updated package versions and code to work with B200s (vllm_utils.py)
+
+## [1.0.1] - 2025-05-31
+
+### Added
+- code: for optional assignment, update alpaca_eval to Llama 3.3 70B Instruct judge
+- handout: add optional assignment on safety, instruction tuning, and RLHF
+
+### Changed
+
+### Fixed
+- code: change masked normalize constant to not equal seqlen, more SFT test coverage
+
+## [1.0.0] - 2025-05-23
+
+### Added
+- code: 2025 assignment on SFT, Expert Iteration, and GRPO with verified rewards on MATH
+- handout: 2025 assignment on SFT, Expert Iteration, and GRPO with verified rewards on MATH
+
+### Changed
+- N/A
+
+### Fixed
+- N/A
+
+## [0.0.3] - 2024-06-05
 
 ### Added
 
 ### Changed
 
-- code: remove `humanfriendly` from requirements.txt, add `matplotlib`
-- handout: modify problem `distributed_communication_multi_node` to specify that
-  multinode measurements should be 2x1, 2x2, and 2x3.
-- handout: clarify that `torch.cuda.synchronize()` is necessary for timing
-  collective communication ops, even when they are called with `async_op=False`.
+- code: fix AlpacaEval auto-evaluator to use local Llama 3 70B instruct.
+- code: add missing `evaluate_safety.py` script to `scripts`
+- code: add Llama 3 tokenizer as a fixture.
+- code: fix DPO loss test
+- code: make SFT dataset test stricter by comparing against expected output to help folks catch bugs.
+- code: include prompts as text files in `cs336_alignment/prompts`
+- handout: fix typo in code example for writing AlpacaEval outputs.
+- handout: provide more instructions on interpreting AlpacaEval annotations file.
+- handout: give better default DPO hyperparameters
+- handout: clarify prompt to use for the DPO loss (AlpacaEval prompt) and mention EOS token
+- handout: clarify that arrows in the prompts are line continuations, not line breaks
+- handout: mention that we provide the prompts as text files at `cs336_alignment/prompts`
 
 ### Fixed
 
-- handout: fixed cut off text in problem memory_profiling (a)
-- handout: fixed mismatch between slurm config and description text in section 3.2
-- code: fix `ToyModelWithTiedWeights` to actually tie weights.
-- handout: fix typo in bucketed DDP test command, should be `pytest tests/test_ddp.py` 
-- handout: fix deliverable of `ddp_overlap_individual_parameters_benchmarking`
-  (a) to not ask for communication time, only end-to-end step time.
-- handout: clarify analysis in `optimizer_state_sharding_accounting` (a).
-
-## [0.0.1] - 2024-04-17
+## 0.0.2 - 2024-05-30
 
 ### Added
 
-- handout: added a short question about variability on problem benchmarking_script
+- code: add MMLU, GSM8K, AlpacaEval, and SimpleSafetyTests data to `./data`.
 
 ### Changed
 
 ### Fixed
 
-- handout: fixed typo in problem `triton_rmsnorm_forward`. The adapters should
-  return the classes, not the `.apply` attribute.
-- code: added `-e` flag to `./cs336-systems/'[test]'`
-- handout: clarified recommendation about the timeit module
-- handout: clarified question about kernel with highest CUDA total
 
-## [0.0.0] - 2024-04-16
+## 0.0.1 - 2024-05-30
 
-Initial release.
+### Added
+
+- handout: explicitly set CUDA_HOME in FlashAttention-2 installation instructions. 
+- code: explicitly set CUDA_HOME in FlashAttention-2 installation instructions.
+
+### Changed
+
+### Fixed
+
+
+## 0.0.0 - 2024-05-30
+
+Initial release
